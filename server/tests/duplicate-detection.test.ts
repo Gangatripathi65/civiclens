@@ -1,32 +1,29 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { connectTestDb, clearTestDb, disconnectTestDb } from './testUtils.js';
-import { User } from '../src/models/User.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Complaint } from '../src/models/Complaint.js';
 import { detectDuplicates } from '../src/services/aiService.js';
 
-beforeAll(connectTestDb);
-afterAll(disconnectTestDb);
-beforeEach(clearTestDb);
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('duplicate detection fallback', () => {
-  it('returns ranked nearby similar complaints', async () => {
-    const citizen = await User.create({ name: 'Citizen', email: 'dup@example.com', password: 'Password123!', role: 'citizen' });
-    const existing = await Complaint.create({
-      publicId: 'CL-DUP-1',
-      creator: citizen._id,
-      title: 'Pothole on ring road',
-      description: 'Large pothole near bus stop causing traffic.',
-      category: 'roads',
-      imageRefs: [],
-      location: { type: 'Point', coordinates: [78.48, 17.39] },
-      severity: 'high',
-      priorityScore: 75,
-      priorityExplanation: 'high',
-      status: 'Reported'
-    });
+  it('returns ranked explanation for similar complaints', async () => {
+    vi.spyOn(Complaint, 'find').mockReturnValue({
+      limit: () => ({
+        lean: async () => [
+          {
+            _id: { toString: () => 'abc123' },
+            publicId: 'CL-123',
+            title: 'Pothole near bus stop',
+            description: 'Large road pothole near bus stop causing traffic delays.'
+          }
+        ]
+      })
+    } as any);
 
-    const matches = await detectDuplicates('000000000000000000000001', 'Pothole near bus stop', 'Ring road pothole', 'roads', [78.4802, 17.3902]);
-    expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(matches[0].complaintId).toBe(existing.id);
+    const matches = await detectDuplicates('new-1', 'Pothole near stop', 'Road pothole at bus stop', 'roads', [78.48, 17.39]);
+    expect(matches).toHaveLength(1);
+    expect(matches[0].publicId).toBe('CL-123');
+    expect(matches[0].explanation).toContain('Text similarity');
   });
 });

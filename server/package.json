@@ -38,6 +38,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.0.0",
     "@types/node": "^24.9.0",
+    "@types/supertest": "^7.2.1",
     "mongodb-memory-server": "^10.2.3",
     "supertest": "^7.1.4",
     "tsx": "^4.20.6",

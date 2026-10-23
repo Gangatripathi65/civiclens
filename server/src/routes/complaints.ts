@@ -14,6 +14,7 @@ import { createAuditLog } from '../services/auditService.js';
 import { upload } from '../middleware/upload.js';
 
 const router = Router();
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const createSchema = z.object({
   title: z.string().min(4).max(160),
@@ -89,11 +90,14 @@ router.get('/', requireAuth, async (req: AuthRequest, res, next) => {
     const page = Number(req.query.page ?? 1);
     const limit = Math.min(Number(req.query.limit ?? 10), 50);
     const query: Record<string, unknown> = {};
+    const status = req.query.status ? complaintStatuses.find((s) => s === req.query.status) : undefined;
+    const category = req.query.category ? complaintCategories.find((c) => c === req.query.category) : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 80) : undefined;
 
     if (req.user!.role === 'citizen') query.creator = req.user!.id;
-    if (req.query.status) query.status = req.query.status;
-    if (req.query.category) query.category = req.query.category;
-    if (req.query.search) query.title = { $regex: String(req.query.search), $options: 'i' };
+    if (status) query.status = status;
+    if (category) query.category = category;
+    if (search) query.title = { $regex: escapeRegex(search), $options: 'i' };
 
     const [items, total] = await Promise.all([
       Complaint.find(query).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
@@ -109,8 +113,10 @@ router.get('/', requireAuth, async (req: AuthRequest, res, next) => {
 router.get('/map', async (req, res, next) => {
   try {
     const filter: Record<string, unknown> = {};
-    if (req.query.status) filter.status = req.query.status;
-    if (req.query.category) filter.category = req.query.category;
+    const status = req.query.status ? complaintStatuses.find((s) => s === req.query.status) : undefined;
+    const category = req.query.category ? complaintCategories.find((c) => c === req.query.category) : undefined;
+    if (status) filter.status = status;
+    if (category) filter.category = category;
     const records = await Complaint.find(filter)
       .select('publicId title category severity status location locality isDemoData createdAt')
       .limit(500)
@@ -234,7 +240,7 @@ router.get('/:id/suggestions', requireAuth, async (req: AuthRequest, res, next) 
     if (req.user!.role !== 'admin' && complaint.creator.toString() !== req.user!.id) throw new ApiError(403, 'Forbidden');
 
     const classification = classifyIssue(complaint.title, complaint.description);
-    const priority = scorePriority(complaint.severity as any, complaint.category, complaint.createdAt);
+    const priority = scorePriority(complaint.severity as any, complaint.category);
 
     res.json({
       classification,

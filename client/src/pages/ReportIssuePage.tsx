@@ -10,8 +10,8 @@ const schema = z.object({
   description: z.string().min(10),
   category: z.enum(complaintCategories).optional(),
   severity: z.enum(severityLevels),
-  latitude: z.coerce.number().min(-90).max(90),
-  longitude: z.coerce.number().min(-180).max(180),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
   address: z.string().optional(),
   locality: z.string().optional(),
   additionalNotes: z.string().optional()
@@ -67,8 +67,8 @@ export const ReportIssuePage = () => {
         </select>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
-        <input className="rounded border p-2" type="number" step="any" placeholder="Latitude" {...register('latitude')} />
-        <input className="rounded border p-2" type="number" step="any" placeholder="Longitude" {...register('longitude')} />
+        <input className="rounded border p-2" type="number" step="any" placeholder="Latitude" {...register('latitude', { valueAsNumber: true })} />
+        <input className="rounded border p-2" type="number" step="any" placeholder="Longitude" {...register('longitude', { valueAsNumber: true })} />
       </div>
       <input className="w-full rounded border p-2" placeholder="Address" {...register('address')} />
       <input className="w-full rounded border p-2" placeholder="Locality" {...register('locality')} />

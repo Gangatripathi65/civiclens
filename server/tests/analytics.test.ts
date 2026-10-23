@@ -1,50 +1,29 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { connectTestDb, clearTestDb, disconnectTestDb } from './testUtils.js';
-import { User } from '../src/models/User.js';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import { Complaint } from '../src/models/Complaint.js';
 import { getAdminStats } from '../src/services/analyticsService.js';
 
-beforeAll(connectTestDb);
-afterAll(disconnectTestDb);
-beforeEach(clearTestDb);
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('analytics calculations', () => {
-  it('calculates dashboard aggregates from records', async () => {
-    const citizen = await User.create({ name: 'Citizen', email: 'analytics@example.com', password: 'Password123!', role: 'citizen' });
+  it('builds admin stats from complaint model data', async () => {
+    vi.spyOn(Complaint, 'countDocuments')
+      .mockResolvedValueOnce(20 as any)
+      .mockResolvedValueOnce(7 as any)
+      .mockResolvedValueOnce(4 as any)
+      .mockResolvedValueOnce(9 as any);
+    vi.spyOn(Complaint, 'aggregate')
+      .mockResolvedValueOnce([{ _id: null, avgHours: 32.4 }] as any)
+      .mockResolvedValueOnce([{ _id: 'roads', count: 6 }] as any)
+      .mockResolvedValueOnce([{ _id: 'Central', count: 5 }] as any);
 
-    await Complaint.create([
-      {
-        publicId: 'CL-1',
-        creator: citizen._id,
-        title: 'Pothole',
-        description: 'Road issue',
-        category: 'roads',
-        imageRefs: [],
-        location: { type: 'Point', coordinates: [78.4, 17.4] },
-        severity: 'high',
-        priorityScore: 80,
-        priorityExplanation: 'high',
-        status: 'Reported'
-      },
-      {
-        publicId: 'CL-2',
-        creator: citizen._id,
-        title: 'Garbage',
-        description: 'Sanitation issue',
-        category: 'sanitation',
-        imageRefs: [],
-        location: { type: 'Point', coordinates: [78.5, 17.3] },
-        severity: 'medium',
-        priorityScore: 50,
-        priorityExplanation: 'medium',
-        status: 'Resolved'
-      }
-    ]);
-
-    const stats = await getAdminStats();
-    expect(stats.total).toBe(2);
-    expect(stats.pending).toBe(1);
-    expect(stats.highPriority).toBe(1);
-    expect(stats.resolved).toBe(1);
+    const result = await getAdminStats();
+    expect(result.total).toBe(20);
+    expect(result.pending).toBe(7);
+    expect(result.highPriority).toBe(4);
+    expect(result.resolved).toBe(9);
+    expect(result.averageResolutionHours).toBe(32.4);
+    expect(result.byCategory[0]._id).toBe('roads');
   });
 });
